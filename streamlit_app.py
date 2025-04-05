@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from io import BytesIO
 
 # Set page config with medical-themed colors
 st.set_page_config(page_title="Medical Price Predictor", layout="centered")
@@ -89,7 +90,7 @@ def load_and_train():
     model.fit(X, y)
     return model, df_encoded
 
-# Prediction and save to Excel
+# Prediction and download Excel
 if st.button("Predict Medical Charges"):
     model, df_encoded = load_and_train()
     input_encoded = pd.get_dummies(input_data)
@@ -104,22 +105,25 @@ if st.button("Predict Medical Charges"):
     </div>
     """, unsafe_allow_html=True)
 
-    # Save result to Excel
+    # Prepare Excel Data
     save_df = input_data.copy()
     save_df['Predicted Charges'] = [prediction]
     save_df['Name'] = name
     save_df = save_df[['Name', 'age', 'sex', 'bmi', 'children', 'smoker', 'region', 'Predicted Charges']]
 
-    try:
-        existing_df = pd.read_excel("predictions.xlsx")
-        combined_df = pd.concat([existing_df, save_df], ignore_index=True)
-    except FileNotFoundError:
-        combined_df = save_df
+    # Create Excel file in memory
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        save_df.to_excel(writer, index=False, sheet_name='Prediction')
+    output.seek(0)
 
-    with pd.ExcelWriter("predictions.xlsx", engine="openpyxl", mode="w") as writer:
-        combined_df.to_excel(writer, index=False)
-
-    st.success("✅ Data saved to predictions.xlsx")
+    # Download button
+    st.download_button(
+        label="📥 Download Prediction as Excel",
+        data=output,
+        file_name="prediction.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 # Optional footer
 st.markdown("---")
